@@ -1,0 +1,9 @@
+cos-python-sdk-v5==1.9.44
+chardet==5.2.0
+datasets==4.8.5
+e2b-code-interpreter==1.5.2
+matplotlib==3.10.9
+openai==2.45.0
+pyarrow==23.0.1
+PyYAML==6.0.3
+swebench==4.1.0

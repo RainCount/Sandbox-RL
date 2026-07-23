@@ -1,0 +1,27 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: swe-rl-settings
+  namespace: swe-rl
+data:
+  E2B_DOMAIN: ap-shanghai.tencentags.com
+  AGS_PROXY_URL: ${AGS_PROXY_URL}
+  AGS_TEMPLATE: swe-rl-sandbox
+  AGS_TIMEOUT_SECONDS: "1800"
+  # Sandbox capacity is deliberately higher than vLLM decode capacity.  Agent
+  # workers spend most of their time waiting for CPU-side commands/tests.
+  AGS_MAX_CONCURRENCY: "24"
+  DOCKERHUB_MIRROR: https://mirror.ccs.tencentyun.com
+  DOCKERHUB_FALLBACK_PREFIXES: docker.1ms.run
+  TCR_REGISTRY: ${TCR_REGISTRY}
+  TCR_NAMESPACE: ${TCR_NAMESPACE}
+  COS_REGION: ${COS_REGION}
+  COS_BUCKET: ${COS_BUCKET}
+  COS_PREFIX: ${COS_PREFIX}
+  WANDB_PROJECT: swe-rl
+  # Must be empty: expandable_segments conflicts with vLLM 0.11.0 CuMemAllocator
+  PYTORCH_CUDA_ALLOC_CONF: ""
+  HF_HUB_OFFLINE: "1"
+  HF_DATASETS_OFFLINE: "1"
+  TRANSFORMERS_OFFLINE: "1"
+  TOKENIZERS_PARALLELISM: "false"

@@ -1,0 +1,7 @@
+- name: ags_swe
+  _target_: swe_rl.verl.agent_loop.AGSSWEAgentLoop
+  enable_thinking: false
+  max_turns: 40
+  max_action_tokens: 3072
+  command_timeout: 180
+  test_timeout: 120

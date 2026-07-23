@@ -1,0 +1,78 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: swe-rl-vllm-${SERVE_RUN_ID}-r${SERVE_ROUND}
+  namespace: swe-rl
+spec:
+  replicas: 1
+  selector:
+    matchLabels: {app: swe-rl-vllm, release: "${SERVE_RUN_ID}-r${SERVE_ROUND}"}
+  template:
+    metadata:
+      labels: {app: swe-rl-vllm, release: "${SERVE_RUN_ID}-r${SERVE_ROUND}"}
+    spec:
+      enableServiceLinks: false
+      nodeSelector: {accelerator/nvidia: "true"}
+      tolerations:
+        - {key: nvidia.com/gpu, operator: Exists, effect: NoSchedule}
+      initContainers:
+        - name: model-downloader
+          image: ${TRAIN_IMAGE}
+          command: ["bash", "-ec"]
+          args:
+            - python3 -m swe_rl.ops.cos_sync download-prefix "${COS_PREFIX}/runs/${SERVE_RUN_ID}/rounds/${SERVE_ROUND_PADDED}/exports/huggingface" /model
+          envFrom:
+            - configMapRef: {name: swe-rl-settings}
+          env:
+            - {name: COS_SECRET_ID, valueFrom: {secretKeyRef: {name: swe-rl-runtime, key: cos-secret-id}}}
+            - {name: COS_SECRET_KEY, valueFrom: {secretKeyRef: {name: swe-rl-runtime, key: cos-secret-key}}}
+          volumeMounts:
+            - {name: model, mountPath: /model}
+      containers:
+        - name: vllm
+          image: ${TRAIN_IMAGE}
+          command: ["python3", "-m", "vllm.entrypoints.openai.api_server"]
+          args:
+            - --model
+            - /model
+            - --served-model-name
+            - ${SERVED_MODEL_NAME}
+            - --tensor-parallel-size
+            - "2"
+            - --dtype
+            - half
+            - --max-model-len
+            - "8192"
+            - --gpu-memory-utilization
+            - "0.85"
+            - --language-model-only
+            - --enable-prefix-caching
+          ports:
+            - {name: http, containerPort: 8000}
+          readinessProbe:
+            httpGet: {path: /health, port: http}
+            initialDelaySeconds: 30
+            periodSeconds: 10
+          resources:
+            requests: {cpu: "8", memory: 50Gi, nvidia.com/gpu: "2"}
+            limits: {cpu: "20", memory: 100Gi, nvidia.com/gpu: "2"}
+          volumeMounts:
+            - {name: model, mountPath: /model}
+            - {name: dshm, mountPath: /dev/shm}
+            - {name: triton-cache, mountPath: /root/.triton}
+      volumes:
+        - {name: model, emptyDir: {sizeLimit: 40Gi}}
+        - {name: dshm, emptyDir: {medium: Memory, sizeLimit: 8Gi}}
+        - name: triton-cache
+          hostPath: {path: /var/lib/swe-rl/triton-cache, type: DirectoryOrCreate}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: swe-rl-vllm
+  namespace: swe-rl
+spec:
+  type: ClusterIP
+  selector: {app: swe-rl-vllm, release: "${SERVE_RUN_ID}-r${SERVE_ROUND}"}
+  ports:
+    - {name: http, port: 8000, targetPort: http}
